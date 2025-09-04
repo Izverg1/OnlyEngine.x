@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - OLLAMA_URL=http://ollama:11434
+      - COMFYUI_URL=http://comfyui:8188
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - ollama
+      - comfyui
+    networks:
+      - onlyengine
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./creative-agency-portfolio
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - FASTAPI_URL=http://backend:8000
+    volumes:
+      - ./creative-agency-portfolio:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - onlyengine
+
+  # ComfyUI Service
+  comfyui:
+    image: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+    ports:
+      - "8188:8188"
+    volumes:
+      - ./ComfyUI:/workspace/ComfyUI
+      - ./models:/workspace/ComfyUI/models
+      - ./outputs:/workspace/ComfyUI/output
+    environment:
+      - PYTHONPATH=/workspace/ComfyUI
+    command: python /workspace/ComfyUI/main.py --listen 0.0.0.0 --port 8188
+    networks:
+      - onlyengine
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Ollama for Mixtral
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - onlyengine
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Supabase (Local Development)
+  supabase-db:
+    image: supabase/postgres:15.1.0.117
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=your-super-secret-password
+      - POSTGRES_DB=postgres
+    volumes:
+      - supabase_db_data:/var/lib/postgresql/data
+    networks:
+      - onlyengine
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - onlyengine
+
+volumes:
+  ollama_data:
+  supabase_db_data:
+
+networks:
+  onlyengine:
+    driver: bridge

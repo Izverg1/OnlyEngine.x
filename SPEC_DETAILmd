@@ -1,0 +1,212 @@
+Below is the complete `OnlyEngine.x_Design_Document.md` file, consolidating all previous iterations into a single, well-formatted Markdown document. This reflects the latest updates as of 12:46 AM EDT on Thursday, September 4, 2025, including the rebranding to "OnlyEngine.x," local development with ComfyUI on your MacBook Pro M4, and VPS hosting plans. All sections—overview, architecture, walk-throughs, phases, tasks, user journey, tech stack, and risks—are integrated for a cohesive blueprint.
+
+```markdown
+# OnlyEngine.x Design Document
+
+## Overview
+OnlyEngine.x is a SaaS platform designed to automate the generation of hyper-realistic MoneyShots (adult content images, e.g., feet or full body), ensuring quality through AI agents, targeting subscribers based on preferences, and streaming content to platforms like OnlyFans, Fansly, and FeetFinder. It operates legally with fictional, disclosed AI-generated content to help creators reverse revenue dips (e.g., 5% MoM). The platform is built with a two-phase approach: Phase 1 focuses on an MVP using existing diffusion models with Mixtral-generated code, while Phase 2 fine-tunes a custom model if traction ($10K/month revenue) is achieved. Authentication and payments are deferred.
+
+Development starts locally on your MacBook Pro M4 (64GB RAM, 1TB storage) for testing and prototyping. Hosting transitions to VPS for production. ComfyUI is integrated as the user-friendly interface for Stable Diffusion workflows, allowing visual node-based prompt building, generation, and QA. This makes local development accessible and scalable to VPS.
+
+- **Business Model**: Subscriptions ($49/month Basic: 100 MoneyShots; $199/month Pro: Unlimited + targeting; Enterprise: $499/month custom).
+- **Revenue Streams**: Subscriptions (70%), upsells (20%), partnerships (10%).
+- **Projections** (Based on real data: Adult AI market $800M in 2025, 30% YoY growth; OnlyFans $7.22B gross 2024):
+  - Year 1: 1,000 users → $1.8M revenue.
+  - Year 2: 5,000 users → $9M revenue.
+  - Year 3: 10,000 users → $18M revenue.
+- **Costs**: $500K startup (dev/cloud: $300K; marketing: $200K); 40% margins Year 1, 70% Year 3.
+- **Legal/Ethical**: Fictional AI, auto-disclosed. Consent-based data. Avoid illegal acts.
+- **Concerns**: Bans (low-volume), IP reliance (custom model), ethics (opt-in).
+- **Proposal**: A/B testing for 20-50% boost. Audio overlays (ElevenLabs, $5/month) later.
+
+## System Architecture
+### High-Level Components
+1. **Frontend**: React app for prompt input, preview, metrics dashboard. Integrates ComfyUI web interface for visual workflow building.
+2. **Backend**: Supabase (PostgreSQL DB, Storage, Auth [deferred], real-time). FastAPI (Python) for API endpoints.
+3. **AI Core**: Mixtral (Ollama) for code gen, agents, logic. Diffusion: Stable Diffusion NSFW (e.g., Pony Diffusion XL) via ComfyUI nodes.
+4. **Automation**: Puppeteer with snapshot-superimpose for creation/uploads.
+5. **Data Flow**: User prompt → ComfyUI/Mixtral refines → Diffusion generates → Mixtral agents QA → Supabase stores → Automate upload/marketing.
+
+### Local Development Walk-Through (MacBook Pro M4)
+Use your Mac for prototyping. ComfyUI runs locally on Apple Silicon with MPS acceleration (for M4 GPU).
+
+1. **Install Dependencies**:
+   - Install Python 3.12 and Git (via Homebrew: `brew install python git`).
+   - Clone ComfyUI: `git clone https://github.com/comfyanonymous/ComfyUI.git`.
+   - Install requirements: `cd ComfyUI; pip install -r requirements.txt`.
+   - For M4 optimization: Use `torch` with MPS: `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu`.
+   - Run: `python main.py` — opens web UI at http://127.0.0.1:8188.
+
+2. **Set Up Model**:
+   - Download Pony Diffusion XL v6 from CivitAI (free, ~5GB): Place in `ComfyUI/models/checkpoints`.
+   - Test prompt in ComfyUI: Create workflow node (Text Prompt → Sampler → VAE Decode → Save Image).
+   - Example Prompt: "photorealistic female foot, size 7, high arch, perfect proportions, soft lighting, natural skin, 8k detail".
+   - Negative: "alien, mutated, blurry, extra limbs".
+
+3. **Integrate QA**:
+   - Use Mixtral (Ollama): Install Ollama, pull Mixtral: `ollama pull mixtral`.
+   - Script QA: Python code to analyze generated image (e.g., CLIP description), reprompt if mutated.
+   - Test locally: Run generation, QA loop on Mac (5-10s/image).
+
+4. **Automation & Backend**:
+   - Install Puppeteer: `npm install puppeteer`.
+   - Set up Supabase local (via Supabase CLI: `supabase start`).
+   - Develop FastAPI: `pip install fastapi uvicorn`, create endpoints (e.g., /generate).
+   - Test: Generate MoneyShots, store in Supabase, simulate upload with Puppeteer.
+
+5. **Debugging**: Use ComfyUI's node graph for visual QA; expect 1-2min full-body generations on M4 GPU.
+
+### VPS Hosting Walk-Through
+Transition to Hostinger VPS ($3.95/month) for production. ComfyUI hosts remotely, accessible via web UI.
+
+1. **VPS Setup**:
+   - Sign up for Hostinger VPS, choose Ubuntu 22.04 with GPU add-on (~$10/month).
+   - SSH in: `ssh user@ip`, update: `sudo apt update && sudo apt upgrade`.
+   - Install NVIDIA drivers: `sudo apt install nvidia-cuda-toolkit`.
+   - Install Docker: `sudo apt install docker.io`, start: `sudo systemctl start docker`.
+
+2. **ComfyUI on VPS**:
+   - Clone ComfyUI: `git clone https://github.com/comfyanonymous/ComfyUI.git`.
+   - Dockerize: Create Dockerfile, build image: `docker build -t comfyui .`.
+   - Run: `docker run -p 8188:8188 -v /path/to/models:/models comfyui` — access at http://vps-ip:8188.
+   - For remote: Add `--listen 0.0.0.0` flag for external access (secure with VPN).
+
+3. **Model Hosting**:
+   - Upload Pony Diffusion XL to VPS storage.
+   - Integrate with FastAPI: Expose ComfyUI API for generation (e.g., /generate endpoint calls ComfyUI workflow).
+   - Scale: Use Docker Compose for multi-GPU; auto-scale with Kubernetes if users >1,000.
+
+4. **Automation & Backend**:
+   - Install Puppeteer on VPS: `npm install puppeteer`.
+   - Link Supabase: Set environment variables in Docker.
+   - Deploy FastAPI: `docker run -p 8000:8000 fastapi-app`.
+   - Test: Generate MoneyShots, QA, upload via Puppeteer/OnlyFansAPI.
+
+5. **Maintenance**: Monitor with Prometheus (install via Docker), auto-backup Supabase data.
+
+## Phase 1: MVP with Existing Diffusion Models + Mixtral (Months 1-3)
+- **Generation**: User prompt → Mixtral refines → Pony Diffusion in ComfyUI generates → Mixtral agents QA.
+- **QA**: Agents fix mutations (max 5 iterations, CLIP score >0.9).
+- **Targeting**: OnlyFansAPI data → Mixtral clusters → Targeted MoneyShots.
+- **Automation**: Puppeteer snapshot-superimpose for creation/uploads, proxies ($1/GB).
+- **Metrics**: QA success, engagement, revenue in Supabase dashboard.
+
+## Phase 2: Custom Fine-Tuned Diffusion Model (Months 4+)
+- **Custom**: Mixtral generates prompts for dataset; fine-tune Pony XL with DreamBooth/LoRA on VPS GPU (~$0.50/hour).
+- **Enhanced**: YOLO for QA, scikit-learn for targeting.
+- **Automation**: Modal.com ($0.10/hour) for scaled hosting.
+
+## Implementation Plan
+### Phase 1: MVP Development (Months 1-3)
+#### Month 1-2: Local Development
+- **Task 1: Local Setup**
+  - Install ComfyUI, Python 3.12, Git on MacBook Pro M4.
+  - Configure Mixtral (Ollama) and Supabase local.
+  - Action: Follow walk-through steps 1-2.
+  - Deadline: End of Month 1.
+  - Resources: ComfyUI GitHub, Ollama docs, Supabase CLI.
+
+- **Task 2: Model Integration**
+  - Download Pony Diffusion XL, test generation in ComfyUI.
+  - Develop QA script with Mixtral.
+  - Action: Set up workflow, validate prompt output.
+  - Deadline: Mid-Month 2.
+  - Resources: CivitAI, Mixtral examples.
+
+- **Task 3: Automation & Backend**
+  - Install Puppeteer, develop FastAPI endpoints.
+  - Simulate upload workflow locally.
+  - Action: Test end-to-end flow.
+  - Deadline: End of Month 2.
+  - Resources: Puppeteer docs, FastAPI tutorial.
+
+#### Month 3: Feature Integration & Testing
+- **Task 4: Targeting Logic**
+  - Integrate OnlyFansAPI data, code Mixtral targeting.
+  - Action: Test DM automation locally.
+  - Deadline: Mid-Month 3.
+  - Resources: OnlyFansAPI docs.
+
+- **Task 5: VPS Migration**
+  - Set up Hostinger VPS, migrate ComfyUI/FastAPI.
+  - Test on VPS with GPU.
+  - Action: Follow VPS walk-through.
+  - Deadline: End of Month 3.
+  - Resources: Hostinger VPS guide.
+
+- **Task 6: Beta Launch**
+  - Deploy React frontend, configure metrics.
+  - Action: Launch beta, test with 10 users.
+  - Deadline: End of Month 3.
+  - Resources: React docs, Grafana setup.
+
+### Phase 2: Custom Model and Scaling (Months 4+)
+#### Month 5+: Post-Traction Development
+- **Task 7: Custom Model**
+  - Generate synthetic dataset, fine-tune Pony XL.
+  - Action: Train on VPS GPU.
+  - Deadline: Mid-Month 5 (if $10K revenue).
+  - Resources: Diffusers guide.
+
+- **Task 8: Enhanced Features**
+  - Implement YOLO QA, scikit-learn targeting.
+  - Action: Test accuracy.
+  - Deadline: End of Month 5.
+  - Resources: YOLO docs, scikit-learn tutorial.
+
+- **Task 9: Auth & Payments**
+  - Add Firebase Auth, Stripe.
+  - Action: Validate transactions.
+  - Deadline: End of Month 5.
+  - Resources: Supabase auth docs.
+
+- **Task 10: Scaling**
+  - Move to Modal.com for hosting.
+  - Action: Optimize performance.
+  - Deadline: Ongoing from Month 6.
+  - Resources: Modal.com docs.
+
+## User Journey Walk-Through
+### Onboarding
+- **Discovery**: Finds OnlyEngine.x via Reddit/X.
+- **Sign-Up**: Enters email, agrees to terms.
+- **Account Setup**: Links OnlyFans, selects platforms.
+
+### Content Creation
+- **Prompt Input**: Enters prompt in OnlyEngine.x UI.
+- **Generation & QA**: Generates MoneyShots, fixes mutations.
+- **Targeting Setup**: Selects prefs, gets suggestions.
+
+### Distribution
+- **Scheduling Uploads**: Sets time, attaches MoneyShots.
+- **Marketing**: Sends targeted DMs.
+- **Performance Review**: Checks metrics.
+
+### Upgrade & Support
+- **Trial to Paid**: Upgrades to Pro.
+- **Support Request**: Submits issue.
+- **Feedback Loop**: Provides NPS.
+
+### Edge Cases
+- **Failure**: Alerts for QA/upload fails.
+- **Ban Risk**: Adjusts proxies.
+- **Privacy**: Displays policy.
+
+## Tech Stack & Costs
+- **Core**: Python, Mixtral (Ollama), Supabase, ComfyUI, Diffusers, Puppeteer.
+- **Cost**: Mixtral free, Supabase $25/month, Hostinger $3.95/month, GPU $10/month, OnlyFansAPI $299/year, Proxies $1/GB.
+- **IP Avoidance**: Synthetic datasets.
+
+## Risks & Mitigation
+- **Legal**: Disclose AI; monitor laws.
+- **Bans**: Low-volume, proxies.
+- **Ethics**: Opt-in data.
+
+This document provides a complete blueprint for local development with ComfyUI, transitioning to VPS. Start with Task 1 on your Mac. Next: Need a Mixtral prompt for Task 2? (As of 12:46 AM EDT, September 4, 2025.)
+```
+
+### Notes
+- **Rebranding**: All instances updated to "OnlyEngine.x" from "MoneyShots" as the platform name, keeping "MoneyShots" for the content type.
+- **Structure**: Organized into clear sections with consistent formatting (headings, lists).
+- **Content**: Combines local development (ComfyUI focus), VPS hosting, phases, tasks, user journey, and more.
+- **Next Steps**: Begin with Task 1 (local setup) or request a Mixtral prompt for Task 2. Let me know!
